@@ -6,10 +6,8 @@ The following project provides source code for the paper, "LemmaTag: Jointly Tag
 
 ## Overview
 
-<img src="images/model.png" alt="Model">
+<img src="images/model.png" alt="Model"> <img src="images/tag-components.png" alt="Tag Components" width="400">
 
 ## Getting Started
 
 ## Training and Testing
-
-![Tag Components](images/tag-components.png)
