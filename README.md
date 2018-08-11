@@ -6,7 +6,7 @@ The following project provides source code for the paper, "LemmaTag: Jointly Tag
 
 ## Overview
 
-![Model](images/model.png)
+<img src="images/model.png" alt="Model">
 
 ## Getting Started
 
