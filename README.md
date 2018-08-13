@@ -52,23 +52,21 @@ git clone https://github.com/Hyperparticle/LemmaTag.git
 cd ./LemmaTag
 ```
 
-2. Install the python packages in requirements.txt if you don't have them already.
+2. Install the python packages in `requirements.txt` if you don't have them already.
 
 ```bash
 pip install -r ./requirements.txt
 ```
 
-### Downloading the Dataset
-
 ### Training and Testing
 
-To start training with default parameters, run
+To start training on a sample dataset with default parameters, run
 
 ```bash
 python lemmatag.py
 ```
 
-This will save the model periodically and output the training/validation accuracy.
+This will save the model periodically and output the training/validation accuracy. See the [Visualize Results](#visualize-results) section on how to view the training graphs.
 
 After training and saving the model to a checkpoint file, one may evaluate using
 
@@ -77,3 +75,17 @@ python lemmatag.py --only_eval
 ```
 
 Run `python lemmatag.py --help` for a list of all supported arguments.
+
+## Downloading Datasets
+
+The `download_dataset.py` script can be used to download and preprocess universal dependencies datasets.
+
+All `train`, `dev`, and `test` files are expected to have 3 tab-separated columns: a word form, its lemma, and its part-of-speech tag. Sentences are split by empty lines. See [data/sample-cs-cltt-ud-test.txt](data/sample-cs-cltt-ud-test.txt) for an example.
+
+## Visualize Results
+
+The training metrics can be viewed with TensorBoard in the `logs` directory:
+
+```bash
+tensorboard --logdir logs
+```

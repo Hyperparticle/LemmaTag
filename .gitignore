@@ -106,3 +106,10 @@ venv.bak/
 
 # Project specific
 /.idea/
+/logs/*
+!/logs/.gitkeep
+/data/*
+!/data/.gitkeep
+!/data/sample-cs-cltt-ud-train.txt
+!/data/sample-cs-cltt-ud-dev.txt
+!/data/sample-cs-cltt-ud-test.txt

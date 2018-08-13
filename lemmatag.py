@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import numpy as np
 import tensorflow as tf
-import morpho_dataset
-from utils import MorphoAnalyzer, Tee, log_time
+from util import morpho_dataset
+from util.utils import MorphoAnalyzer, Tee, log_time
 from pprint import pprint
 import argparse
 import datetime
@@ -635,7 +635,7 @@ def main():
     parser.add_argument("--only_eval", default=False, action="store_true", help="Skip training and only evaluate once (from a checkpoint).")
     # Data and seed
     parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-    parser.add_argument("--data_prefix", default="lc-sense-czech-pdt-", type=str, help="Path+prefix for input files (prepended to 'dev.txt', 'train.txt' and 'test.txt'")
+    parser.add_argument("--data_prefix", default="data/cs-cltt-ud-", type=str, help="Path+prefix for input files (prepended to 'dev.txt', 'train.txt' and 'test.txt'")
     parser.add_argument("--analyser", default=None, type=str, help="Analyser text file (default none).")
     parser.add_argument("--max_sentences", default=None, type=int, help="Max sentences to load (for quick testing).")
     # Dimensions and features
@@ -653,7 +653,7 @@ def main():
     parser.add_argument("--loss_sense_w", default=0.1, type=float, help="Sense loss weight (if sense is separate).")
     parser.add_argument("--loss_lem_w", default=1.0, type=float, help="Lemmatization loss weight.")
     # Regularization
-    parser.add_argument("--dropout", default=0.5, type=float, help="Dropout")
+    parser.add_argument("--dropout", default=0.5, type=float, help="Dropout rate")
     parser.add_argument("--label_smoothing", default=0.1, type=float, help="Label smoothing.")
     parser.add_argument("--lem_smoothing", default=0.0, type=float, help="Lemma label smoothing.")
     parser.add_argument("--sense_smoothing", default=0.05, type=float, help="Sense label smoothing.")
