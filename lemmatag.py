@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-# The main LemmaTag code can be found here.
+# The main LemmaTag code can be found below.
 
 import numpy as np
 import tensorflow as tf
 from util import morpho_dataset
-from util.utils import MorphoAnalyzer, Tee, log_time
+from util.utils import MorphoAnalyzer, Tee, log_time, find_first, FixedBeamSearchDecoder, AddInputsWrapper
 from pprint import pprint
 import argparse
 import datetime
@@ -18,55 +18,6 @@ from tensorflow.python.client import timeline
 import logging
 from logging import warning, info, debug, error
 from util.tags import WholeTags, CharTags, DictTags
-
-
-def find_first(vec, val, transpose=True):
-    if transpose:
-        vec = tf.transpose(vec)
-    #vec = tf.Print(vec, [tf.shape(vec)])
-    vheight = tf.shape(vec)[1]
-    vlen = tf.shape(vec)[0]
-
-    def step(st, col):
-        ix, poss = st
-        #col = tf.Print(col, [ix, tf.shape(col), col])
-        eqs = tf.cast(tf.equal([val], col), dtype=tf.int32)
-        return (ix + 1, tf.minimum(poss, ix * eqs + vlen * (1 - eqs)))
-
-    return tf.scan(step, vec, (0, vlen + tf.zeros(vheight, dtype=tf.int32)))[1][-1, :]
-
-
-class FixedBeamSearchDecoder(tf.contrib.seq2seq.BeamSearchDecoder):
-    def finalize(self, outputs, final_state, sequence_lengths):
-        # BeamSearchDecoder does not follow the correct semantics of the the finished flag
-        # which results in taking wrong length here and getting wrong decoded string.
-        # We substitute the sequence length recorded by dynamic_decoder (which is wrong because
-        # of the wrong finished flag returned by BeamSearchDecoder.step) with the length
-        # recorded in BeamSearchState which is correct.
-        # See https://github.com/tensorflow/tensorflow/issues/13536
-        return super().finalize(outputs, final_state, final_state.lengths)
-
-
-class AddInputsWrapper(tf.nn.rnn_cell.RNNCell):
-    def __init__(self, cell, extra_input, name=None, **kwargs):
-        super(AddInputsWrapper, self).__init__(name=name)
-        self._cell = cell = cell
-        self._extra_input = extra_input
-
-    def __call__(self, inputs, state, scope=None):
-        inputs_exp = tf.concat([inputs, self._extra_input], axis=-1)
-        return self._cell.__call__(inputs_exp, state, scope=scope)
-
-    @property
-    def state_size(self):
-        return self._cell.state_size
-
-    @property
-    def output_size(self):
-        return self._cell.output_size
-
-    def zero_state(self, batch_size, dtype):
-        return self._cell.zero_state(batch_size, dtype)
 
 
 class Network:

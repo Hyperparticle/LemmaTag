@@ -1,8 +1,11 @@
+# Contains utility methods and classes
+
 import contextlib
 import time
 import sys
 import numpy as np
 from logging import warning, info, debug, error
+import tensorflow as tf
 
 
 class Tee:
@@ -59,6 +62,22 @@ def log_time(prefix=""):
             info('{} took {:.2f} s ({:.2f} min)'.format(prefix, dt, dt / 60.0))
 
 
+def find_first(vec, val, transpose=True):
+    if transpose:
+        vec = tf.transpose(vec)
+    #vec = tf.Print(vec, [tf.shape(vec)])
+    vheight = tf.shape(vec)[1]
+    vlen = tf.shape(vec)[0]
+
+    def step(st, col):
+        ix, poss = st
+        #col = tf.Print(col, [ix, tf.shape(col), col])
+        eqs = tf.cast(tf.equal([val], col), dtype=tf.int32)
+        return (ix + 1, tf.minimum(poss, ix * eqs + vlen * (1 - eqs)))
+
+    return tf.scan(step, vec, (0, vlen + tf.zeros(vheight, dtype=tf.int32)))[1][-1, :]
+
+
 class MorphoAnalyzer:
     """ Loader for data of morphological analyzer.
 
@@ -109,3 +128,36 @@ class MorphoAnalyzer:
     def get_tag_ids_len_array(self, word, length):
         ids = self.get_tag_ids(word)[:length]
         return (len(ids), np.array(ids + [0] * (length - len(ids))))
+
+
+class FixedBeamSearchDecoder(tf.contrib.seq2seq.BeamSearchDecoder):
+    def finalize(self, outputs, final_state, sequence_lengths):
+        # BeamSearchDecoder does not follow the correct semantics of the the finished flag
+        # which results in taking wrong length here and getting wrong decoded string.
+        # We substitute the sequence length recorded by dynamic_decoder (which is wrong because
+        # of the wrong finished flag returned by BeamSearchDecoder.step) with the length
+        # recorded in BeamSearchState which is correct.
+        # See https://github.com/tensorflow/tensorflow/issues/13536
+        return super().finalize(outputs, final_state, final_state.lengths)
+
+
+class AddInputsWrapper(tf.nn.rnn_cell.RNNCell):
+    def __init__(self, cell, extra_input, name=None, **kwargs):
+        super(AddInputsWrapper, self).__init__(name=name)
+        self._cell = cell = cell
+        self._extra_input = extra_input
+
+    def __call__(self, inputs, state, scope=None):
+        inputs_exp = tf.concat([inputs, self._extra_input], axis=-1)
+        return self._cell.__call__(inputs_exp, state, scope=scope)
+
+    @property
+    def state_size(self):
+        return self._cell.state_size
+
+    @property
+    def output_size(self):
+        return self._cell.output_size
+
+    def zero_state(self, batch_size, dtype):
+        return self._cell.zero_state(batch_size, dtype)

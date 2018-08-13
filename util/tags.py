@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # Defines classes for processing different types of tags
 
 import numpy as np
