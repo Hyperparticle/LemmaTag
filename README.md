@@ -103,3 +103,18 @@ The training metrics can be viewed with TensorBoard in the `logs` directory:
 ```bash
 tensorboard --logdir logs
 ```
+
+## Credits
+
+Please cite this project ([PDF](https://www.researchgate.net/publication/326960698_LemmaTag_Jointly_Tagging_and_Lemmatizing_for_Morphologically-Rich_Languages_with_BRNNs)) as
+
+> Daniel Kondratyuk, Tomáš Gavenčiak, and Milan Straka. 2018. "**LemmaTag: Jointly Tagging and Lemmatizing for Morphologically Rich Languages with BRNNs**". In *Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing (EMNLP 2018)*.
+
+```bibtex
+@article{kondratyuk2018jointly,
+  title={LemmaTag: Jointly Tagging and Lemmatizing for Morphologically-Rich Languages with BRNNs},
+  author={Kondratyuk, Daniel and Gavenčiak, Tomáš and Straka, Milan},
+  journal={Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing (EMNLP 2018)},
+  year={2018}
+}
+```
