@@ -30,5 +30,5 @@ def ud_to_lemma_tag(lines, pos="XPOS", max_lines=None):
 if __name__ == "__main__":
     import sys
 
-    for lemma_tag in ud_to_lemma_tag(sys.stdin, max_lines=20):
+    for lemma_tag in ud_to_lemma_tag(sys.stdin):
         print(lemma_tag)

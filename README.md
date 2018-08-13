@@ -6,9 +6,9 @@ The following project provides a neural network architecture for [part-of-speech
 
 ## Overview
 
-There are two main ideas to LemmaTag:
+There are two main ideas:
 
-1. Sharing the initial layers of the network is mutually beneficial for part-of-speech tagging and lemmatization, as they are similar tasks. This results in higher accuracy and requires less training time.
+1. Since part-of-speech tagging and lemmatization are related tasks, sharing the initial layers of the network is mutually beneficial. This results in higher accuracy and requires less training time.
 2. The lemmatizer can further improve its accuracy by looking at the tagger's predictions, i.e., taking the output of the tagger as an additional lemmatizer input.
 
 ### Model
@@ -21,17 +21,17 @@ The model consists of 3 parts:
 
 The image below provides a detailed overview of the architecture and design of the system.
 
-[![Model](images/model.png)](https://www.researchgate.net/publication/326960698_LemmaTag_Jointly_Tagging_and_Lemmatizing_for_Morphologically-Rich_Languages_with_BRNNs "Model")
+[![Model](images/model.png)](https://www.researchgate.net/publication/326960698_LemmaTag_Jointly_Tagging_and_Lemmatizing_for_Morphologically-Rich_Languages_with_BRNNs "LemmaTag model")
 
 - **Bottom** - Word-level encoder, with word input `w`, character inputs `c`, character states `e^c`, and combined word embedding `e^w`. Thick slanted lines denote [training dropout](https://medium.com/@amarbudhiraja/https-medium-com-amarbudhiraja-learning-less-to-learn-better-dropout-in-deep-machine-learning-74334da4bfc5).
 - **Top Left** - Sentence-level encoder and tag classifier, with word-level inputs `e^w`. Two BRNN layers with residual connections act on the embedded words of a sentence, producing intermediate sentence contexts `o^w` and tag classification `t`.
-- **Top Right** - Lemma decoder, consisting of a [seq2seq decoder](https://medium.com/@devnag/seq2seq-the-clown-car-of-deep-learning-f88e1204dac3) with [attention](http://www.wildml.com/2016/01/attention-and-memory-in-deep-learning-and-nlp/) on character encodings `e^c`, and with additional inputs of processed tagger features `t`, embeddings `e^w` and sentence-level contexts `o^w`.
+- **Top Right** - Lemma decoder, consisting of a [seq2seq decoder](https://medium.com/@devnag/seq2seq-the-clown-car-of-deep-learning-f88e1204dac3) with [attention](http://www.wildml.com/2016/01/attention-and-memory-in-deep-learning-and-nlp/) on character encodings `e^c`, and with additional inputs of processed tagger features `t`, embeddings `e^w` and sentence-level contexts `o^w`, producing lemma characters `l`.
 
  For technical details, see the paper, ["LemmaTag: Jointly Tagging and Lemmatizing for Morphologically-Rich Languages with BRNNs"](https://www.researchgate.net/publication/326960698_LemmaTag_Jointly_Tagging_and_Lemmatizing_for_Morphologically-Rich_Languages_with_BRNNs).
 
 ### Morphology Tagging
 
-Not all languages are alike when part-of-speech tagging. For instance, the Czech language has over 1500 different types of tags, while English has about 50. This discrepancy is due to Czech being a morphologically-rich language, which alters the ending of a word to modify aspects like case, number, and gender. English, on the other hand, gets around this by relying heavily on the positioning of a word relative to other words.
+Not all languages are alike when part-of-speech tagging. For instance, the Czech language has over 1500 different types of tags, while English has about 50. This discrepancy is due to Czech being a morphologically-rich language, which alters the endings of its words to indicate information like case, number, and gender. English, on the other hand, relies heavily on the positioning of a word relative to other words to convey this information.
 
 The image below shows how Czech tags are split up into several subcategories that delineate a word's [morphology](http://all-about-linguistics.group.shef.ac.uk/branches-of-linguistics/morphology/what-is-morphology/), along with the number of unique values in each subcategory.
 
@@ -68,19 +68,33 @@ python lemmatag.py
 
 This will save the model periodically and output the training/validation accuracy. See the [Visualize Results](#visualize-results) section on how to view the training graphs.
 
-After training and saving the model to a checkpoint file, one may evaluate using
+For a list of all supported arguments, run
 
 ```bash
-python lemmatag.py --only_eval
+python lemmatag.py --help
 ```
 
-Run `python lemmatag.py --help` for a list of all supported arguments.
+## Obtaining Datasets
 
-## Downloading Datasets
+A wide range of datasets supporting many languages can be downloaded from [Universal Dependencies](http://universaldependencies.org/). Each dataset repo should contain `train`, `dev`, and `test` files in `conllu` tab-separated format.
 
-The `download_dataset.py` script can be used to download and preprocess universal dependencies datasets.
+<!-- The `download_dataset.py` script can be used to download and preprocess universal dependencies datasets. -->
 
-All `train`, `dev`, and `test` files are expected to have 3 tab-separated columns: a word form, its lemma, and its part-of-speech tag. Sentences are split by empty lines. See [data/sample-cs-cltt-ud-test.txt](data/sample-cs-cltt-ud-test.txt) for an example.
+The `train`, `dev`, and `test` files must be converted to LemmaTag format, which is a reduced `conllu` format with 3 tab-separated columns: the word form, its lemma, and its part-of-speech tag. Sentences are split by empty lines. See [data/sample-cs-cltt-ud-test.txt](data/sample-cs-cltt-ud-test.txt) for an example.
+
+To convert from `conllu` to LemmaTag format, run
+
+```bash
+python util/ud_to_lemma_tag.py < INPUT_FILE > OUTPUT_FILE
+```
+
+where `INPUT_FILE` and `OUTPUT_FILE` are the names of the input and output dataset files. Ensure that the filenames end in `train.txt`, `dev.txt`, and `test.txt`.
+
+Finally, train a model on the dataset with the `--data_prefix` flag where `PREFIX` is the filename prefix:
+
+```bash
+python lemmatag.py --data_prefix PREFIX
+```
 
 ## Visualize Results
 
