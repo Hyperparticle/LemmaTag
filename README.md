@@ -113,7 +113,7 @@ Please cite this project ([PDF](https://www.researchgate.net/publication/3269606
 ```bibtex
 @article{kondratyuk2018jointly,
   title={LemmaTag: Jointly Tagging and Lemmatizing for Morphologically-Rich Languages with BRNNs},
-  author={Kondratyuk, Daniel and Gavenčiak, Tomáš and Straka, Milan},
+  author={Kondratyuk, Daniel and  Gaven\v{c}iak, Tom\'a\v{s} and Straka, Milan},
   journal={Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing (EMNLP 2018)},
   year={2018}
 }
