@@ -104,6 +104,8 @@ The training metrics can be viewed with TensorBoard in the `logs` directory:
 tensorboard --logdir logs
 ```
 
+Then navigate to [localhost:6006](http://localhost:6006).
+
 ## Credits
 
 Please cite this project ([PDF](https://www.researchgate.net/publication/326960698_LemmaTag_Jointly_Tagging_and_Lemmatizing_for_Morphologically-Rich_Languages_with_BRNNs)) as
