@@ -434,7 +434,8 @@ class Network:
 
         return lemmas, tags
 
-def main():
+
+if __name__ == "__main__":
     # Parse arguments
     parser = argparse.ArgumentParser()
     # General and training arguments
@@ -569,7 +570,3 @@ def main():
                         print("", file=ofile)
 
         dev_best = max(dev_best, dev_acc_tag + dev_acc_lemsense)
-
-
-if __name__ == "__main__":
-    main()
