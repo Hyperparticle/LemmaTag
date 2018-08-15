@@ -452,7 +452,10 @@ def main():
     parser.add_argument("--only_eval", default=False, action="store_true", help="Skip training and only evaluate once (from a checkpoint).")
     # Data and seed
     parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-    parser.add_argument("--data_prefix", default="data/sample-cs-cltt-ud-", type=str, help="Path+prefix for input files (prepended to 'dev.txt', 'train.txt' and 'test.txt'")
+    parser.add_argument("--train", default="data/sample-cs-cltt-ud-train.txt", type=str, help="Training data path.")
+    parser.add_argument("--dev", default="data/sample-cs-cltt-ud-dev.txt", type=str, help="Validation data path.")
+    parser.add_argument("--test", default="data/sample-cs-cltt-ud-test.txt", type=str, help="Test data path.")
+
     parser.add_argument("--analyser", default=None, type=str, help="Analyser text file (default none).")
     parser.add_argument("--max_sentences", default=None, type=int, help="Max sentences to load (for quick testing).")
     # Dimensions and features
@@ -509,9 +512,9 @@ def main():
     # Load the data
     with log_time("load inputs"):
         args.max_dev_sentences = args.max_sentences // 5 if args.max_sentences else None
-        train = morpho_dataset.MorphoDataset(args.data_prefix + "train.txt", max_sentences=args.max_sentences)
-        dev = morpho_dataset.MorphoDataset(args.data_prefix + "dev.txt", train=train, shuffle_batches=False, max_sentences=args.max_dev_sentences)
-        test = morpho_dataset.MorphoDataset(args.data_prefix + "test.txt", train=train, shuffle_batches=False, max_sentences=args.max_dev_sentences)
+        train = morpho_dataset.MorphoDataset(args.train, max_sentences=args.max_sentences)
+        dev = morpho_dataset.MorphoDataset(args.dev, train=train, shuffle_batches=False, max_sentences=args.max_dev_sentences)
+        test = morpho_dataset.MorphoDataset(args.test, train=train, shuffle_batches=False, max_sentences=args.max_dev_sentences)
         analyser = MorphoAnalyzer(args.analyser) if args.analyser else None
 
     # Construct the network

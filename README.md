@@ -88,12 +88,12 @@ To convert from `conllu` to LemmaTag format, run
 python util/ud_to_lemma_tag.py < INPUT_FILE > OUTPUT_FILE
 ```
 
-where `INPUT_FILE` and `OUTPUT_FILE` are the names of the input and output dataset files. Ensure that the filenames end in `train.txt`, `dev.txt`, and `test.txt`.
+where `INPUT_FILE` and `OUTPUT_FILE` are the names of the input and output dataset files.
 
-Finally, train a model on the dataset with the `--data_prefix` flag where `PREFIX` is the filename prefix:
+Finally, train a model on the dataset with the `--train`, `--dev`, and `--test` flags:
 
 ```bash
-python lemmatag.py --data_prefix PREFIX
+python lemmatag.py --train TRAIN_FILE --dev DEV_FILE --test TEST_FILE
 ```
 
 ## Visualize Results
