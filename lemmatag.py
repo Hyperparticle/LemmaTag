@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 # The main LemmaTag code can be found below.
+# Author: Daniel Kondratyuk, Tomáš Gavenčiak, and Milan Straka
 
 import numpy as np
 import tensorflow as tf
@@ -20,7 +21,9 @@ from logging import warning, info, debug, error
 from util.tags import WholeTags, CharTags, DictTags
 
 
-class Network:
+class LemmaTagNetwork:
+    """LemmaTag class that constructs, trains, and evaluates the model"""
+
     def __init__(self, threads, seed=42):
         # Create an empty graph and a session
         graph = tf.Graph()
@@ -81,8 +84,6 @@ class Network:
             # RNN Cell
             if args.rnn_cell == "LSTM":
                 rnn_cell = tf.nn.rnn_cell.BasicLSTMCell
-#                def rnn_cell(*a, **kw):
-#                    return tf.nn.rnn_cell.BasicLSTMCell(*a, state_is_tuple=False, **kw)
             elif args.rnn_cell == "GRU":
                 rnn_cell = tf.nn.rnn_cell.GRUCell
             else:
@@ -201,10 +202,8 @@ class Network:
                         def btile(x):
                             return tf.contrib.seq2seq.tile_batch(x, beams) if beams else x
                         cell = base_cell
-                        cell = AddInputsWrapper(cell, btile(word_rnn_outputs)) # Already dropouted
-                        cell = AddInputsWrapper(cell, btile(tag_features)) # Already dropouted
-                        #do_inp_size = word_cle_states.shape[-1] + tchar_emb.shape[-1]
-                        #cell = tf.contrib.rnn.DropoutWrapper(cell, input_size=do_inp_size, output_keep_prob=1.0 - args.dropout, input_keep_prob=1.0 - args.dropout, variational_recurrent=True, dtype=tf.float32)
+                        cell = AddInputsWrapper(cell, btile(word_rnn_outputs)) # Already dropped out
+                        cell = AddInputsWrapper(cell, btile(tag_features)) # Already dropped out
                         cell = AddInputsWrapper(cell, btile(word_cle_states))
                         att = tf.contrib.seq2seq.LuongAttention(args.rnn_cell_dim, btile(word_cle_outputs), memory_sequence_length=btile(word_form_len))
                         cell = tf.contrib.seq2seq.AttentionWrapper(cell, att, output_attention=False)
@@ -214,7 +213,6 @@ class Network:
                 pred_cell = create_attn_cell(args.beams) # Reuses the attenrion memory
 
                 if args.rnn_cell == "LSTM":
-                    #initial_lstm_gate = tf.get_variable('initial_lstm_c', [1, args.rnn_cell_dim])
                     initial_state = tf.nn.rnn_cell.LSTMStateTuple(c=word_cle_states, h=word_cle_states)
                 else:
                     initial_state = word_cle_states
@@ -311,7 +309,6 @@ class Network:
             with tf.control_dependencies(self.update_ops):
                 optimizer = tf.contrib.opt.LazyAdamOptimizer(learning_rate=self.learning_rate, beta2=args.beta_2)
                 gradients, variables = zip(*optimizer.compute_gradients(loss))
-                #pprint(variables)
                 self.gradient_norm = tf.global_norm(gradients)
                 if args.grad_clip:
                     gradients, _ = tf.clip_by_global_norm(gradients, args.grad_clip)
@@ -519,17 +516,18 @@ if __name__ == "__main__":
         analyser = MorphoAnalyzer(args.analyser) if args.analyser else None
 
     # Construct the network
-    #if args.compositional_tags_regularization or args.whole_tags_regularization:
     if args.tag_type == "char":
         args.tags = CharTags(train, args.compositional_tags_regularization, args.whole_tags_regularization)
-    # elif args.tag_type == "dict":
-    #     args.tags = DictTags(train, args.compositional_tags_regularization, args.whole_tags_regularization)
+    elif args.tag_type == "dict":
+        # TODO: add support for dictionary tags
+        raise ValueError("Tag type not supported: " + args.tag_type)
+        # args.tags = DictTags(train, args.compositional_tags_regularization, args.whole_tags_regularization)
     elif args.tag_type == "whole":
         args.tags = WholeTags(train)
     else:
         raise ValueError("Invalid tag_type")
 
-    network = Network(threads=args.threads, seed=args.seed)
+    network = LemmaTagNetwork(threads=args.threads, seed=args.seed)
     network.construct(args, len(train.factors[train.FORMS].words), len(train.factors[train.FORMS].alphabet),
                       len(train.factors[train.LEMMAS].alphabet), args.tags.num_tags(),
                       len(train.factors[train.SENSES].words), train.factors[train.LEMMAS].alphabet_map["<bow>"],
