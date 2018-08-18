@@ -111,9 +111,9 @@ Please cite this project ([PDF](https://arxiv.org/pdf/1808.03703.pdf)) as
 > Daniel Kondratyuk, Tomáš Gavenčiak, and Milan Straka. 2018. "**LemmaTag: Jointly Tagging and Lemmatizing for Morphologically Rich Languages with BRNNs**". In *Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing (EMNLP 2018)*.
 
 ```bibtex
-@article{kondratyuk2018jointly,
+@article{kondratyuk2018lemmatag,
   title={LemmaTag: Jointly Tagging and Lemmatizing for Morphologically-Rich Languages with BRNNs},
-  author={Kondratyuk, Daniel and  Gaven\v{c}iak, Tom\'a\v{s} and Straka, Milan},
+  author={Kondratyuk, Daniel and Gaven{\v{c}}iak, Tom{\'a}{\v{s}} and Straka, Milan},
   journal={Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing (EMNLP 2018)},
   year={2018}
 }
