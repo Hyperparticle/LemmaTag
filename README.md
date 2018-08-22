@@ -78,7 +78,7 @@ python lemmatag.py --help
 
 A wide range of datasets supporting many languages can be downloaded from [Universal Dependencies](http://universaldependencies.org/). Each dataset repo should contain `train`, `dev`, and `test` files in `conllu` tab-separated format.
 
-The `train`, `dev`, and `test` files must be converted to `conllu` or 3-column LemmaTag format.
+The `train`, `dev`, and `test` files must be converted to `conllu` or LemmaTag format. The LemmaTag format has 3 tab-separated columns: the word form, its lemma, and its part-of-speech tag. Sentences are split by empty lines. See [data/sample-cs-cltt-ud-test.txt](data/sample-cs-cltt-ud-test.txt) for an example of a small Czech dataset.
 
 To read the dataset as `conllu` files, use the `--conllu` flag and specify the dataset files with `--train`, `--dev`, and `--test`:
 
