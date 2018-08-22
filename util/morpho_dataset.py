@@ -1,6 +1,7 @@
 # Processes dataset files
 
 import numpy as np
+from util.conllu_to_lemmatag import conllu_to_lemmatag
 
 
 class MorphoDataset:
@@ -37,7 +38,8 @@ class MorphoDataset:
             self.charseq_ids = []
             self.strings = []
 
-    def __init__(self, filename, train=None, shuffle_batches=True, max_sentences=None, add_bow_eow=False, advtags=None, advtag_len=16):
+    def __init__(self, filename, train=None, shuffle_batches=True, max_sentences=None,
+                 add_bow_eow=False, advtags=None, advtag_len=16, conllu_format=False):
         """Load dataset from file in vertical format.
 
         Arguments:
@@ -57,6 +59,11 @@ class MorphoDataset:
         # Load the sentences
         with open(filename, "r", encoding="utf-8") as file:
             in_sentence = False
+
+            # Convert to
+            if conllu_format:
+                file = conllu_to_lemmatag(file)
+
             for line in file:
                 line = line.rstrip("\r\n")
                 if line:

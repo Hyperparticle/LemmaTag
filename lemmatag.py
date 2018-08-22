@@ -6,12 +6,10 @@
 import numpy as np
 import tensorflow as tf
 from util import morpho_dataset
-from util.utils import MorphoAnalyzer, Tee, log_time, find_first, FixedBeamSearchDecoder, AddInputsWrapper
-from pprint import pprint
+from util.utils import MorphoAnalyzer, Tee, log_time, find_first, AddInputsWrapper
 import argparse
 import datetime
 import os
-import re
 import shutil
 import sys
 from tqdm import tqdm
@@ -435,6 +433,7 @@ class LemmaTagNetwork:
 if __name__ == "__main__":
     # Parse arguments
     parser = argparse.ArgumentParser()
+
     # General and training arguments
     parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
     parser.add_argument("--epochs", default=40, type=int, help="Number of epochs.")
@@ -448,14 +447,16 @@ if __name__ == "__main__":
     parser.add_argument("--record_trace", default=False, action="store_true", help="Record training trace as Chrome trace (load at 'chrome://tracing/').")
     parser.add_argument("--no_save_net", default=False, action="store_true", help="Skip checkoint saving (to save space when debugging).")
     parser.add_argument("--only_eval", default=False, action="store_true", help="Skip training and only evaluate once (from a checkpoint).")
+
     # Data and seed
     parser.add_argument("--seed", default=42, type=int, help="Random seed.")
     parser.add_argument("--train", default="data/sample-cs-cltt-ud-train.txt", type=str, help="Training data path.")
     parser.add_argument("--dev", default="data/sample-cs-cltt-ud-dev.txt", type=str, help="Validation data path.")
     parser.add_argument("--test", default="data/sample-cs-cltt-ud-test.txt", type=str, help="Test data path.")
-
+    parser.add_argument("--conllu", default=False, action="store_true", help="Using a conllu-formatted dataset")
     parser.add_argument("--analyser", default=None, type=str, help="Analyser text file (default none).")
     parser.add_argument("--max_sentences", default=None, type=int, help="Max sentences to load (for quick testing).")
+
     # Dimensions and features
     parser.add_argument("--cle_dim", default=64, type=int, help="Character-level embedding dimension.")
     parser.add_argument("--rnn_cell", default="LSTM", type=str, help="RNN cell type.")
@@ -470,6 +471,7 @@ if __name__ == "__main__":
     parser.add_argument("--beams", default=None, type=int, help="Use beam search with the given no of beams.")
     parser.add_argument("--loss_sense_w", default=0.1, type=float, help="Sense loss weight (if sense is separate).")
     parser.add_argument("--loss_lem_w", default=1.0, type=float, help="Lemmatization loss weight.")
+
     # Regularization
     parser.add_argument("--dropout", default=0.5, type=float, help="Dropout rate")
     parser.add_argument("--label_smoothing", default=0.1, type=float, help="Label smoothing.")
@@ -510,9 +512,9 @@ if __name__ == "__main__":
     # Load the data
     with log_time("load inputs"):
         args.max_dev_sentences = args.max_sentences // 5 if args.max_sentences else None
-        train = morpho_dataset.MorphoDataset(args.train, max_sentences=args.max_sentences)
-        dev = morpho_dataset.MorphoDataset(args.dev, train=train, shuffle_batches=False, max_sentences=args.max_dev_sentences)
-        test = morpho_dataset.MorphoDataset(args.test, train=train, shuffle_batches=False, max_sentences=args.max_dev_sentences)
+        train = morpho_dataset.MorphoDataset(args.train, max_sentences=args.max_sentences, conllu_format=args.conllu)
+        dev = morpho_dataset.MorphoDataset(args.dev, train=train, shuffle_batches=False, max_sentences=args.max_dev_sentences, conllu_format=args.conllu)
+        test = morpho_dataset.MorphoDataset(args.test, train=train, shuffle_batches=False, max_sentences=args.max_dev_sentences, conllu_format=args.conllu)
         analyser = MorphoAnalyzer(args.analyser) if args.analyser else None
 
     # Construct the network
