@@ -109,7 +109,8 @@ venv.bak/
 /logs/*
 !/logs/.gitkeep
 /data/*
-!/data/.gitkeep
+!/data/
+!/data/LICENSE_CS_CLTT
 !/data/sample-cs-cltt-ud-train.txt
 !/data/sample-cs-cltt-ud-dev.txt
 !/data/sample-cs-cltt-ud-test.txt
