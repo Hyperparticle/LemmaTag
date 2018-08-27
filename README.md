@@ -35,7 +35,7 @@ Not all languages are alike when part-of-speech tagging. For instance, the Czech
 
 The image below shows how Czech tags are split up into several subcategories that delineate a word's [morphology](http://all-about-linguistics.group.shef.ac.uk/branches-of-linguistics/morphology/what-is-morphology/), along with the number of unique values in each subcategory.
 
-![Tag Components](images/tag-components-small.png "Czech morphology tags")
+[![Tag Components](images/tag-components.png "Czech morphology tags")](http://ufal.mff.cuni.cz/czech-tagging/)
 
 LemmaTag takes advantage of this by also predicting each tag subcategory and feeding this information to the lemmatizer (if the subcategories exist for the language). This modification improves both tagging and lemmatizing accuracies.
 
