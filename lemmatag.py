@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 # The main LemmaTag code can be found below.
+# For an up-to-date version of this code, see https://github.com/Hyperparticle/LemmaTag
 # Author: Daniel Kondratyuk, Tomáš Gavenčiak, and Milan Straka
 
 import numpy as np
