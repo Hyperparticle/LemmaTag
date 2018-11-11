@@ -409,7 +409,7 @@ if __name__ == "__main__":
     parser.add_argument("--dev", default="data/sample-cs-cltt-ud-dev.txt", type=str, help="Validation data path.")
     parser.add_argument("--test", default="data/sample-cs-cltt-ud-test.txt", type=str, help="Test data path.")
     parser.add_argument("--conllu", default=False, action="store_true", help="Using a conllu-formatted dataset")
-    parser.add_argument("--analyser", default=None, type=str, help="Analyser text file (default none).")
+    parser.add_argument("--analyzer", default=None, type=str, help="Analyzer text file (default none).")
     parser.add_argument("--max_sentences", default=None, type=int, help="Max sentences to load (for quick testing).")
 
     # Dimensions and features
@@ -470,7 +470,7 @@ if __name__ == "__main__":
         train = morpho_dataset.MorphoDataset(args.train, max_sentences=args.max_sentences, conllu_format=args.conllu)
         dev = morpho_dataset.MorphoDataset(args.dev, train=train, shuffle_batches=False, max_sentences=args.max_dev_sentences, conllu_format=args.conllu)
         test = morpho_dataset.MorphoDataset(args.test, train=train, shuffle_batches=False, max_sentences=args.max_dev_sentences, conllu_format=args.conllu)
-        analyser = MorphoAnalyzer(args.analyser) if args.analyser else None
+        # analyzer = MorphoAnalyzer(args.analyzer) if args.analyzer else None
 
     # Construct the network
     if args.tag_type == "char":
