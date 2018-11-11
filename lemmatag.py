@@ -6,8 +6,6 @@
 
 import numpy as np
 import tensorflow as tf
-from util import morpho_dataset
-from util.utils import MorphoAnalyzer, Tee, log_time, find_first, AddInputsWrapper
 import argparse
 import datetime
 import os
@@ -17,7 +15,11 @@ from tqdm import tqdm
 from tensorflow.python.client import timeline
 import logging
 from logging import warning, info, debug, error
+
+from util import morpho_dataset
+from util.utils import MorphoAnalyzer, Tee, log_time, find_first, AddInputsWrapper
 from util.tags import WholeTags, CharTags, DictTags
+from model.encoder import encoder_network
 
 
 class LemmaTagNetwork:
@@ -88,59 +90,11 @@ class LemmaTagNetwork:
             else:
                 raise ValueError("Unknown rnn_cell {}".format(args.rnn_cell))
 
-            # Create one word embedding
-            def embed_words(name="common"):
-                matrix_word_embeddings = tf.get_variable("word_embeddings_{}".format(name), shape=[num_words, args.we_dim], dtype=tf.float32)
-                # [sentences, words, dim]
-                return tf.nn.embedding_lookup(matrix_word_embeddings, self.word_ids)
-
-            # Character-level embeddings
-            def embed_characters(name="common"):
-                with tf.variable_scope("char_embed_{}".format(name)):
-                    character_embeddings = tf.get_variable("character_embeddings_{}".format(name), shape=[num_chars, args.cle_dim], dtype=tf.float32)
-                    characters_embedded = tf.nn.embedding_lookup(character_embeddings, self.charseqs)
-                    characters_embedded = tf.layers.dropout(characters_embedded, rate=args.dropout, training=self.is_training)
-                    (output_fwd, output_bwd), (state_fwd, state_bwd) = tf.nn.bidirectional_dynamic_rnn(
-                        tf.nn.rnn_cell.GRUCell(args.cle_dim), tf.nn.rnn_cell.GRUCell(args.cle_dim),
-                        characters_embedded, sequence_length=self.charseq_lens, dtype=tf.float32)
-                    cle_states = tf.concat([state_fwd, state_bwd], axis=1)
-                    cle_outputs = tf.concat([output_fwd, output_bwd], axis=1)
-                    sentence_cle_states = tf.nn.embedding_lookup(cle_states, self.charseq_ids)
-                    sentence_cle_outputs = tf.nn.embedding_lookup(cle_outputs, self.charseq_ids)
-                    word_cle_states = tf.gather_nd(sentence_cle_states, self.word_indexes)
-                    word_cle_outputs = tf.gather_nd(sentence_cle_outputs, self.word_indexes)
-                    return sentence_cle_states, word_cle_outputs, word_cle_states
-
-            if args.separate_embed:
-                # [sentences, words, dim], [words, char, dim], [words, dim]
-                rnn_inputs_lemmas, word_cle_outputs, word_cle_states = embed_characters(name="lemmas")
-                rnn_inputs_lemmas += embed_words(name="lemmas")
-                rnn_inputs_tags = embed_words(name="tags") + embed_characters(name="tags")[0]
-            else:
-                # [sentences, words, dim], [words, char, dim], [words, dim]
-                rnn_inputs_lemmas, word_cle_outputs, word_cle_states = embed_characters(name="common")
-                rnn_inputs_lemmas += embed_words(name="common")
-                rnn_inputs_tags = rnn_inputs_lemmas
-
-            # Sentence-level RNN computation
-            def compute_rnn(name, inputs):
-                hidden_layer = tf.layers.dropout(inputs, rate=args.dropout, training=self.is_training)
-                for i in range(args.rnn_layers):
-                    with tf.variable_scope("word-level-rnn-{}".format(name)):
-                        (hidden_layer_fwd, hidden_layer_bwd), _ = tf.nn.bidirectional_dynamic_rnn(
-                            rnn_cell(args.rnn_cell_dim), rnn_cell(args.rnn_cell_dim),
-                            hidden_layer, sequence_length=self.sentence_lens, dtype=tf.float32,
-                            scope="word-level-rnn-{}-{}".format(name, i))
-                        hidden_layer += tf.layers.dropout(hidden_layer_fwd + hidden_layer_bwd, rate=args.dropout, training=self.is_training)
-                return hidden_layer
-
-            if args.separate_rnn:
-                sentence_rnn_outputs_tags = compute_rnn("tags", rnn_inputs_tags)
-                _sentence_rnn_outputs_lemma = compute_rnn("lemmas", rnn_inputs_lemmas)
-                word_rnn_outputs = tf.gather_nd(_sentence_rnn_outputs_lemma, self.word_indexes)
-            else:
-                sentence_rnn_outputs_tags = compute_rnn("common", rnn_inputs_tags)
-                word_rnn_outputs = tf.gather_nd(sentence_rnn_outputs_tags, self.word_indexes)
+            enc_out = encoder_network(self.word_indexes, self.word_ids, self.charseqs, self.charseq_ids,
+                                      self.charseq_lens, self.sentence_lens, num_words, num_chars, args.we_dim,
+                                      args.cle_dim, rnn_cell, args.rnn_cell_dim, args.rnn_layers, args.dropout,
+                                      self.is_training, args.separate_embed, args.separate_rnn)
+            rnn_inputs_tags, word_rnn_outputs, sentence_rnn_outputs_tags, word_cle_states, word_cle_outputs = enc_out
 
             # Tag predictions, loss and accuracy
             def compute_tags():
