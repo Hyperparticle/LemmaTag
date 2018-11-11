@@ -20,6 +20,7 @@ from util import morpho_dataset
 from util.utils import MorphoAnalyzer, Tee, log_time, find_first, AddInputsWrapper
 from util.tags import WholeTags, CharTags, DictTags
 from model.encoder import encoder_network
+from model.tag_decoder import tag_decoder, tag_features
 
 
 class LemmaTagNetwork:
@@ -90,55 +91,24 @@ class LemmaTagNetwork:
             else:
                 raise ValueError("Unknown rnn_cell {}".format(args.rnn_cell))
 
+            # Encoder
             enc_out = encoder_network(self.word_indexes, self.word_ids, self.charseqs, self.charseq_ids,
                                       self.charseq_lens, self.sentence_lens, num_words, num_chars, args.we_dim,
                                       args.cle_dim, rnn_cell, args.rnn_cell_dim, args.rnn_layers, args.dropout,
                                       self.is_training, args.separate_embed, args.separate_rnn)
             rnn_inputs_tags, word_rnn_outputs, sentence_rnn_outputs_tags, word_cle_states, word_cle_outputs = enc_out
 
-            # Tag predictions, loss and accuracy
-            def compute_tags():
-                self.predictions, loss_tag = [], 0
-                self.tag_outputs = []
-                for i, (tags, weight) in enumerate(num_tags):
-                    output_layer = tf.layers.dense(sentence_rnn_outputs_tags, tags)
-                    self.tag_outputs.append(output_layer)
-                    self.predictions.append(tf.argmax(output_layer, axis=2, output_type=tf.int32))
+            # Tagger
+            loss_tag, tag_outputs, self.predictions, correct_tag, correct_tags_compositional = tag_decoder(
+                self.tags, sentence_rnn_outputs_tags, weights, sum_weights, num_tags, args.tags, args.label_smoothing)
 
-                    # Training
-                    if args.label_smoothing:
-                        gold_labels = tf.one_hot(self.tags[:, :, i], tags) * (1 - args.label_smoothing) + args.label_smoothing / tags
-                        loss_tag += tf.losses.softmax_cross_entropy(gold_labels, output_layer, weights=weights) * weight
-                    else:
-                        loss_tag += tf.losses.sparse_softmax_cross_entropy(self.tags[:, :, i], output_layer, weights=weights) * weight
-                self.tag_outputs = tf.concat(self.tag_outputs, axis=-1)  # Tagger output features for lemmatizer
-                self.predictions = tf.stack(self.predictions, axis=-1)
+            # Tagger features for lemmatizer
+            tag_feats = tag_features(tag_outputs, self.word_indexes, words_count, args.rnn_cell_dim, args.dropout,
+                                        self.is_training, args.no_tags_to_lemmas, args.tag_signal_dropout)
 
-                correct_tag = tf.reduce_sum(tf.cast(tf.reduce_all(
-                    tf.logical_or(tf.equal(self.tags, self.predictions), tf.logical_not(args.tags.accuracy_mask())),
-                    axis=2), tf.float32) * weights) / sum_weights
-                correct_tags_compositional = tf.reduce_sum(tf.cast(tf.reduce_all(tf.equal(  # Average accuracy of all tags
-                    self.tags, self.predictions), axis=2), tf.float32) * weights) / sum_weights
-
-                self.current_accuracy_tag, self.update_accuracy_tag = tf.metrics.mean(correct_tag, weights=sum_weights)
-                self.current_accuracy_tags_compositional, self.update_accuracy_tags_compositional = tf.metrics.mean(correct_tags_compositional)
-                return loss_tag
-
-            loss_tag = compute_tags()
-
-            # Tag encoder for lemmatizer
-            tag_features = self.tag_outputs
-            tag_features = tf.stop_gradient(tag_features)
-            #tag_features = tf.layers.dropout(tag_features, rate=args.dropout, training=self.is_training)
-            tag_features = tf.layers.dense(tag_features, args.rnn_cell_dim, activation=tf.nn.relu)
-            tag_features = tf.layers.dropout(tag_features, rate=args.dropout, training=self.is_training)
-            tag_features = tf.gather_nd(tag_features, self.word_indexes)
-            # Renormed word-level signal dropout
-            if args.tag_signal_dropout:
-                tag_features = tf.layers.dropout(tag_features, noise_shape=[words_count, 1], rate=args.tag_signal_dropout, training=self.is_training) * (1 - tf.cast(self.is_training, tf.float32) * args.tag_signal_dropout)
-            # Switch the data rather the shapes
-            if not args.tags_to_lemmas:
-                tag_features = tf.zeros([words_count, args.rnn_cell_dim], dtype=tf.float32)
+            self.current_accuracy_tag, self.update_accuracy_tag = tf.metrics.mean(correct_tag, weights=sum_weights)
+            self.current_accuracy_tags_compositional, self.update_accuracy_tags_compositional = tf.metrics.mean(
+                correct_tags_compositional)
 
             # Lemma decoder
             def decode_lemmas():
@@ -155,10 +125,11 @@ class LemmaTagNetwork:
                         def btile(x):
                             return tf.contrib.seq2seq.tile_batch(x, beams) if beams else x
                         cell = base_cell
-                        cell = AddInputsWrapper(cell, btile(word_rnn_outputs)) # Already dropped out
-                        cell = AddInputsWrapper(cell, btile(tag_features)) # Already dropped out
+                        cell = AddInputsWrapper(cell, btile(word_rnn_outputs))  # Already dropped out
+                        cell = AddInputsWrapper(cell, btile(tag_feats))         # Already dropped out
                         cell = AddInputsWrapper(cell, btile(word_cle_states))
-                        att = tf.contrib.seq2seq.LuongAttention(args.rnn_cell_dim, btile(word_cle_outputs), memory_sequence_length=btile(word_form_len))
+                        att = tf.contrib.seq2seq.LuongAttention(args.rnn_cell_dim, btile(word_cle_outputs),
+                                                                memory_sequence_length=btile(word_form_len))
                         cell = tf.contrib.seq2seq.AttentionWrapper(cell, att, output_attention=False)
                         return cell
 
@@ -177,7 +148,7 @@ class LemmaTagNetwork:
                     train_decoder = tf.contrib.seq2seq.BasicDecoder(cell=train_cell, helper=train_helper, output_layer=decoder_layer, initial_state=train_initial_state)
                     train_outputs, _, _ = tf.contrib.seq2seq.dynamic_decode(decoder=train_decoder)
                     train_logits = train_outputs.rnn_output
-                    self.lemma_predictions_training = train_outputs.sample_id
+                    lemma_predictions_training = train_outputs.sample_id
 
                 # Compute loss with smoothing
                 with tf.variable_scope("lem_loss"):
@@ -195,8 +166,8 @@ class LemmaTagNetwork:
                         pred_helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(embedding=tchar_emb, start_tokens=tf.tile([bow], [words_count]), end_token=eow)
                         pred_initial_state = pred_cell.zero_state(words_count, tf.float32).clone(cell_state=initial_state)
                         pred_decoder = tf.contrib.seq2seq.BasicDecoder(cell=pred_cell, helper=pred_helper, output_layer=decoder_layer, initial_state=pred_initial_state)
-                        pred_outputs, _, self.lemma_prediction_lengths = tf.contrib.seq2seq.dynamic_decode(decoder=pred_decoder, maximum_iterations=tf.reduce_max(self.charseq_lens) + 10)
-                        self.lemma_predictions = tf.argmax(pred_outputs.rnn_output, axis=2, output_type=tf.int32)
+                        pred_outputs, _, lemma_prediction_lengths = tf.contrib.seq2seq.dynamic_decode(decoder=pred_decoder, maximum_iterations=tf.reduce_max(self.charseq_lens) + 10)
+                        lemma_predictions = tf.argmax(pred_outputs.rnn_output, axis=2, output_type=tf.int32)
                     else:
                         # Beam search predictions
                         pred_initial_state = pred_cell.zero_state(words_count * args.beams, tf.float32).clone(cell_state=tf.contrib.seq2seq.tile_batch(initial_state, args.beams))
@@ -204,56 +175,58 @@ class LemmaTagNetwork:
                             pred_cell, embedding=tchar_emb, start_tokens=tf.tile([bow], [words_count]),
                             end_token=eow, output_layer=decoder_layer, beam_width=args.beams,
                             initial_state=pred_initial_state, length_penalty_weight=args.beam_len_penalty)
-                        dec_outputs, dec_state, dec_lens = tf.contrib.seq2seq.dynamic_decode(decoder=pred_decoder, maximum_iterations=tf.reduce_max(self.charseq_lens) + 10)
-                        self.lemma_predictions = dec_outputs.predicted_ids[:, :, 0]
-                        self.lemma_prediction_lengths = 1 + find_first(self.lemma_predictions, eow)
+                        dec_outputs, dec_state, dec_lens = tf.contrib.seq2seq.dynamic_decode(decoder=pred_decoder,
+                                                                                             maximum_iterations=tf.reduce_max(self.charseq_lens) + 10)
+                        lemma_predictions = dec_outputs.predicted_ids[:, :, 0]
+                        lemma_prediction_lengths = 1 + find_first(lemma_predictions, eow)
 
-                return loss_lem
+                return loss_lem, (lemma_predictions_training, lemma_predictions, lemma_prediction_lengths)
 
-            loss_lem = decode_lemmas()
+            loss_lem, predictions = decode_lemmas()
+            self.lemma_predictions_training, self.lemma_predictions, self.lemma_prediction_lengths = predictions
 
             # Sense predictions
             def compute_sense():
-                if args.builtin_sense:
-                    self.sense_prediction = tf.zeros([words_count], dtype=tf.int64)
-                    return 0.0
-                else:
+                if args.predict_sense:
                     sense_features = word_rnn_outputs
-                    sense_features = tf.concat([sense_features, tag_features], axis=-1)
+                    sense_features = tf.concat([sense_features, tag_feats], axis=-1)
                     sense_layer = tf.layers.dense(sense_features, num_senses)
-                    self.sense_prediction = tf.argmax(sense_layer, axis=1)
+                    sense_prediction = tf.argmax(sense_layer, axis=1)
                     _gold_senses = tf.one_hot(target_senses, num_senses)
-                    return tf.losses.softmax_cross_entropy(_gold_senses, sense_layer, label_smoothing=args.sense_smoothing)
+                    sense_loss = tf.losses.softmax_cross_entropy(
+                        _gold_senses, sense_layer, label_smoothing=args.sense_smoothing)
+                else:
+                    sense_prediction = tf.zeros([words_count], dtype=tf.int64)
+                    sense_loss = 0.0
 
-            loss_sense = compute_sense()
+                return sense_loss, sense_prediction
 
+            loss_sense, self.sense_prediction = compute_sense()
+
+            # compute_lemma_stats
             # Lemma predictions, loss and accuracy
-            def compute_lemma_stats():
+            # Training accuracy
+            accuracy_training_lem = tf.reduce_all(tf.logical_or(
+                tf.equal(self.lemma_predictions_training, target_seqs),
+                tf.logical_not(tf.sequence_mask(target_lens))), axis=1)
+            self.current_accuracy_lem_train, self.update_accuracy_lem_train = tf.metrics.mean(accuracy_training_lem) # , weights=sum_weights)
+            accuracy_training_lemsense = tf.logical_and(
+                accuracy_training_lem,
+                tf.equal(self.sense_prediction, tf.cast(target_senses, dtype=tf.int64)))
+            self.current_accuracy_lemsense_train, self.update_accuracy_lemsense_train = tf.metrics.mean(accuracy_training_lemsense) # , weights=sum_weights)
 
-                # Training accuracy
-                accuracy_training_lem = tf.reduce_all(tf.logical_or(
-                    tf.equal(self.lemma_predictions_training, target_seqs),
-                    tf.logical_not(tf.sequence_mask(target_lens))), axis=1)
-                self.current_accuracy_lem_train, self.update_accuracy_lem_train = tf.metrics.mean(accuracy_training_lem) # , weights=sum_weights)
-                accuracy_training_lemsense = tf.logical_and(
-                    accuracy_training_lem,
-                    tf.equal(self.sense_prediction, tf.cast(target_senses, dtype=tf.int64)))
-                self.current_accuracy_lemsense_train, self.update_accuracy_lemsense_train = tf.metrics.mean(accuracy_training_lemsense) # , weights=sum_weights)
-
-                # Predict accuracy
-                minimum_length = tf.minimum(tf.shape(self.lemma_predictions)[1], tf.shape(target_seqs)[1])
-                correct_lem = tf.logical_and(
-                    tf.equal(self.lemma_prediction_lengths, target_lens),
-                    tf.reduce_all(tf.logical_or(
-                        tf.equal(self.lemma_predictions[:, :minimum_length], target_seqs[:, :minimum_length]),
-                        tf.logical_not(tf.sequence_mask(target_lens, maxlen=minimum_length))), axis=1))
-                self.current_accuracy_lem, self.update_accuracy_lem = tf.metrics.mean(correct_lem) # , weights=sum_weights)
-                correct_lemsense = tf.logical_and(
-                    correct_lem,
-                    tf.equal(self.sense_prediction, tf.cast(target_senses, dtype=tf.int64)))
-                self.current_accuracy_lemsense, self.update_accuracy_lemsense = tf.metrics.mean(correct_lemsense) # , weights=sum_weights)
-
-            compute_lemma_stats()
+            # Predict accuracy
+            minimum_length = tf.minimum(tf.shape(self.lemma_predictions)[1], tf.shape(target_seqs)[1])
+            correct_lem = tf.logical_and(
+                tf.equal(self.lemma_prediction_lengths, target_lens),
+                tf.reduce_all(tf.logical_or(
+                    tf.equal(self.lemma_predictions[:, :minimum_length], target_seqs[:, :minimum_length]),
+                    tf.logical_not(tf.sequence_mask(target_lens, maxlen=minimum_length))), axis=1))
+            self.current_accuracy_lem, self.update_accuracy_lem = tf.metrics.mean(correct_lem) # , weights=sum_weights)
+            correct_lemsense = tf.logical_and(
+                correct_lem,
+                tf.equal(self.sense_prediction, tf.cast(target_senses, dtype=tf.int64)))
+            self.current_accuracy_lemsense, self.update_accuracy_lemsense = tf.metrics.mean(correct_lemsense) # , weights=sum_weights)
 
             # Loss, training and gradients
             loss = loss_tag + loss_lem * args.loss_lem_w + loss_sense * args.loss_sense_w
@@ -373,7 +346,7 @@ class LemmaTagNetwork:
                     lemmas.append([])
                     for i in range(length):
                         lemmas[-1].append(''.join(alphabet[lp[i][j]] for j in range(lpl[i] - 1)))
-                        if not args.builtin_sense:
+                        if args.predict_sense:
                             if senses[i] > 0 and sense_words[senses[i]]:
                                 sword = sense_words[senses[i]]
                                 if sword and sword != "<pad>":
@@ -394,7 +367,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", default=40, type=int, help="Number of epochs.")
     parser.add_argument("--threads", default=4, type=int, help="Maximum number of threads to use.")
     parser.add_argument("--name", default="", type=str, help="Any name comment.")
-    parser.add_argument("--checkpoint", default="", type=str, help="Checkpoint.")
+    parser.add_argument("--checkpoint", default="", type=str, help="Checkpoint restore directory.")
     parser.add_argument("--beta_2", default=0.99, type=float, help="Adam beta 2.")
     parser.add_argument("--learning_rate", default=0.001, type=float, help="Learning rate.")
     parser.add_argument("--drop_rate_after", default=20, type=int, help="Number of epochs after which the rate is quartered every 10 epochs.")
@@ -413,14 +386,14 @@ if __name__ == "__main__":
     parser.add_argument("--max_sentences", default=None, type=int, help="Max sentences to load (for quick testing).")
 
     # Dimensions and features
-    parser.add_argument("--cle_dim", default=64, type=int, help="Character-level embedding dimension.")
+    parser.add_argument("--cle_dim", default=400, type=int, help="Character-level embedding dimension.")
     parser.add_argument("--rnn_cell", default="LSTM", type=str, help="RNN cell type.")
-    parser.add_argument("--rnn_cell_dim", default=128, type=int, help="RNN cell dimension.")
+    parser.add_argument("--rnn_cell_dim", default=800, type=int, help="RNN cell dimension.")
     parser.add_argument("--rnn_layers", default=2, type=int, help="RNN layers.")
-    parser.add_argument("--we_dim", default=128, type=int, help="Word embedding dimension.")
-    parser.add_argument("--att_dim", default=64, type=int, help="Attention dimension.")
-    parser.add_argument("--builtin_sense", default=False, action="store_true", help="Train and predict the sense as a builtin part of the lemma (use dataset without separated sense for that).")
-    parser.add_argument("--tags_to_lemmas", default=False, action="store_true", help="Use tag components as a signal to the lemmatizer.")
+    parser.add_argument("--we_dim", default=800, type=int, help="Word embedding dimension.")
+    parser.add_argument("--att_dim", default=400, type=int, help="Attention dimension.")
+    parser.add_argument("--predict_sense", default=False, action="store_true", help="Train and predict the sense as a part of the lemma (use dataset with separated sense for that).")
+    parser.add_argument("--no_tags_to_lemmas", default=False, action="store_true", help="Don't use tag components as a signal to the lemmatizer.")
     parser.add_argument("--separate_rnn", default=False, action="store_true", help="Use separate RNN for tags and lemmas/senses.")
     parser.add_argument("--separate_embed", default=False, action="store_true", help="Use separate embeddings for tags and lemmas/senses. Implies separate_rnn.")
     parser.add_argument("--beams", default=None, type=int, help="Use beam search with the given no of beams.")
