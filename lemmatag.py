@@ -237,7 +237,7 @@ class LemmaTagNetwork:
 
     def evaluate(self, dataset_name, dataset, args):
         self.session.run(self.reset_metrics)
-        with tqdm(total=len(dataset.sentence_lens), file=args.realstderr) as progress_bar:
+        with tqdm(total=len(dataset.sentence_lens), file=args.realstderr, unit="sent") as progress_bar:
             while not dataset.epoch_finished():
                 sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, word_indexes = dataset.next_batch(args.batch_size, including_charseqs=True)
                 self.session.run([self.update_accuracy_tag, self.update_accuracy_tags_compositional, self.update_accuracy_lem, self.update_accuracy_lemsense, self.update_loss],
@@ -256,7 +256,7 @@ class LemmaTagNetwork:
         lemmas = []
         alphabet = dataset.factors[dataset.LEMMAS].alphabet
         sense_words = dataset.factors[dataset.SENSES].words
-        with tqdm(total=len(dataset.sentence_lens), file=args.realstderr) as progress_bar:
+        with tqdm(total=len(dataset.sentence_lens), file=args.realstderr, unit="sent") as progress_bar:
             while not dataset.epoch_finished():
                 sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, word_indexes = dataset.next_batch(args.batch_size, including_charseqs=True)
                 tp, lp, lpl, senses = self.session.run(
