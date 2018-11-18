@@ -202,7 +202,7 @@ class LemmaTagNetwork:
 
     def train_epoch(self, train, args, rate):
         first = True
-        with tqdm(total=len(train.sentence_lens), file=args.realstderr) as progress_bar:
+        with tqdm(total=len(train.sentence_lens), file=args.realstderr, unit="sent") as progress_bar:
             while not train.epoch_finished():
                 sentence_lens, word_ids, charseq_ids, charseqs, charseq_lens, word_indexes = train.next_batch(args.batch_size, including_charseqs=True)
                 if args.word_dropout:
@@ -231,7 +231,7 @@ class LemmaTagNetwork:
                     fetched_timeline = timeline.Timeline(run_metadata.step_stats)
                     chrome_trace = fetched_timeline.generate_chrome_trace_format()
                     gs = self.session.run(self.global_step)
-                    with open(args.logdir + '/timeline_train_{}.json'.format(gs), 'w') as f:
+                    with open(args.logdir + '/timeline_train_{}.json'.format(gs), 'w', encoding="utf-8") as f:
                         f.write(chrome_trace)
                 first = False
 
@@ -413,7 +413,7 @@ if __name__ == "__main__":
             for dset, name in [(dev, "dev"), (test, "test")]:
                 fname = "{}/taglem_{}_ep{}.txt".format(args.logdir, name, ep)
                 info("Predicting %s into %s", name, fname)
-                with open(fname, "w") as ofile:
+                with open(fname, "w", encoding="utf-8") as ofile:
                     forms = dset.factors[dset.FORMS].strings
                     lemmas, tags = network.predict(dset, args)
                     for s in range(len(forms)):

@@ -24,8 +24,8 @@ class Tee:
     def __exit__(self, *exceptinfo):
         self.stop()
 
-    def start(self):
-        self.file = open(self.filename, self.mode)
+    def start(self, encoding="utf-8"):
+        self.file = open(self.filename, self.mode, encoding=encoding)
         self.stdout = sys.stdout
         self.stderr = sys.stderr
         sys.stdout = self
