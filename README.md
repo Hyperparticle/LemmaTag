@@ -2,7 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![TensorFlow 1.12](https://img.shields.io/badge/TensorFlow-1.12-orange.svg)](https://www.tensorflow.org/install/) [![Python 3.5+](https://img.shields.io/badge/Python-3.5+-yellow.svg)](https://www.python.org/downloads/)
 
-The following project provides a neural network architecture for [part-of-speech tagging](https://medium.com/greyatom/learning-pos-tagging-chunking-in-nlp-85f7f811a8cb) and [lemmatizing](https://blog.bitext.com/what-is-the-difference-between-stemming-and-lemmatization/) sentences, achieving state-of-the-art results for morphologically-rich languages, e.g., Czech, German, and Arabic [(Kondratyuk et al., 2018)](https://arxiv.org/abs/1808.03703).
+The following project provides a neural network architecture for [part-of-speech tagging](https://medium.com/greyatom/learning-pos-tagging-chunking-in-nlp-85f7f811a8cb) and [lemmatizing](https://blog.bitext.com/what-is-the-difference-between-stemming-and-lemmatization/) sentences, achieving state-of-the-art (as of 2018) results for morphologically-rich languages, e.g., Czech, German, and Arabic [(Kondratyuk et al., 2018)](https://arxiv.org/abs/1808.03703).
 
 ## Overview
 
